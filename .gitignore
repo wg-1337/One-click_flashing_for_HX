@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 构建产物
+dist/
+build/
+*.spec
+一键刷机.exe
+
+# 运行期产物
+logs/*
+!logs/.gitkeep
+gpt.json
+read_result.log
+启动错误.log

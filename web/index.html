@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>一键刷机</title>
+<link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+<header class="appbar">
+  <div class="ab-left">
+    <div class="ab-logo">
+      <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.2h5L9 22l8.6-11.4h-5L13 2Z"/></svg>
+    </div>
+    <div class="ab-text">
+      <div class="ab-title">一键刷机</div>
+      <div class="ab-sub">Qualcomm 9008 · eMMC</div>
+    </div>
+  </div>
+  <div class="ab-right">
+    <span class="chip" id="c-driver"><i></i><em>高通驱动</em><b>检测中</b></span>
+    <span class="chip" id="c-edl"><i></i><em>9008</em><b>未连接</b></span>
+    <span class="chip" id="c-adb"><i></i><em>ADB</em><b>未连接</b></span>
+  </div>
+</header>
+
+<main class="page">
+  <div class="col-main">
+    <section class="card">
+      <div class="card-head"><h2>操作</h2></div>
+      <div class="card-body">
+        <p class="desc">先读取分区表核对机型，确认后擦除数据分区，再重启设备。</p>
+        <div class="actions">
+          <button class="btn filled" id="btn-flash">开始刷机</button>
+          <button class="btn tonal" id="btn-adb">检测 ADB 并冻结</button>
+          <span class="spacer"></span>
+          <button class="btn text" id="btn-driver">安装高通驱动</button>
+          <button class="btn text" id="btn-addrv">安装 ADB 驱动</button>
+          <button class="btn text" id="btn-reset">重置</button>
+        </div>
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <div class="progress-meta"><span id="phase-label">空闲</span><span id="meter-val">—</span></div>
+      </div>
+    </section>
+
+    <section class="card manual" id="manual-card" hidden>
+      <div class="card-head">
+        <h2>现在需要你手动完成</h2>
+        <span class="head-hint" id="manual-hint">第 1–5 步</span>
+      </div>
+      <div class="card-body">
+        <ol class="manual-list" id="manual-list">
+          <li data-manual="1"><input type="checkbox"><div><b>恢复出厂设置</b><p>设备会重启几次并进入恢复模式，在里面选择“恢复出厂设置”。</p></div></li>
+          <li data-manual="2"><input type="checkbox"><div><b>连接无网络热点</b><p>手机关掉 Wi-Fi 和移动数据，再开热点；平板连接该热点完成激活。</p></div></li>
+          <li data-manual="3"><input type="checkbox"><div><b>打开开发者选项</b><p>设置 → 关于平板电脑，连续点击“HarmonyOS 版本号”，直到提示已开启开发者模式。</p></div></li>
+          <li data-manual="4"><input type="checkbox"><div><b>开启 USB 调试</b><p>系统和更新 → 开发人员选项：打开“USB 调试”，关闭“监控 ADB 安装应用”，打开“仅充电模式下允许 ADB 调试”。</p></div></li>
+          <li data-manual="5"><input type="checkbox"><div><b>连接电脑并授权</b><p>用数据线连接电脑，在平板上允许 USB 调试，之后会自动停用相关应用。</p></div></li>
+        </ol>
+        <p class="manual-note">第 7 步冻结完成后，请不要打开应用市场、云空间、华为账号、系统更新等华为账号相关功能。</p>
+      </div>
+    </section>
+
+    <section class="card console" id="console">
+      <div class="con-head">
+        <h2>输出</h2>
+        <div class="seg" id="filters">
+          <button class="on" data-lvl="all">全部</button>
+          <button data-lvl="warn">警告</button>
+          <button data-lvl="error">错误</button>
+        </div>
+        <div class="con-tools">
+          <button class="icon-btn" id="btn-copy" title="复制">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M6 15H5V5a1 1 0 0 1 1-1h10v1"/></svg>
+          </button>
+          <button class="icon-btn" id="btn-clear" title="清空">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>
+          </button>
+          <button class="icon-btn" id="btn-fold" title="折叠">
+            <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="con-body" id="log"></div>
+    </section>
+  </div>
+
+  <aside class="col-side">
+    <section class="card">
+      <div class="card-head"><h2>步骤</h2></div>
+      <ol class="steps" id="timeline">
+        <li data-step="driver"><i>1</i><div><b>驱动</b><span>检查 9008 驱动</span></div></li>
+        <li data-step="connect"><i>2</i><div><b>连接</b><span>握手并载入引导</span></div></li>
+        <li data-step="verify"><i>3</i><div><b>校验</b><span>读取分区表核对机型</span></div></li>
+        <li data-step="erase"><i>4</i><div><b>擦除</b><span>userdata、version</span></div></li>
+        <li data-step="reboot"><i>5</i><div><b>重启</b><span>进入恢复模式</span></div></li>
+        <li data-step="guide"><i>6</i><div><b>激活</b><span>开启 USB 调试</span></div></li>
+        <li data-step="freeze"><i>7</i><div><b>冻结</b><span>停用管控相关应用</span></div></li>
+      </ol>
+    </section>
+
+
+    <section class="card">
+      <div class="card-head"><h2>设备</h2><span class="head-hint" id="dev-hint">未连接</span></div>
+      <div class="card-body">
+        <dl class="spec">
+          <div><dt>芯片</dt><dd id="s-chip">—</dd></div>
+          <div><dt>序列号</dt><dd id="s-serial">—</dd></div>
+          <div><dt>存储</dt><dd id="s-storage">—</dd></div>
+          <div><dt>容量</dt><dd id="s-cap">—</dd></div>
+          <div><dt>分区数量</dt><dd id="s-parts">—</dd></div>
+          <div><dt>磁盘 GUID</dt><dd id="s-guid" class="mono">—</dd></div>
+        </dl>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<dialog id="dlg" class="m3-dialog">
+  <form method="dialog">
+    <h2 id="dlg-title">确认</h2>
+    <p class="dlg-sub" id="dlg-sub">此操作不可撤销</p>
+    <p class="dlg-body" id="dlg-text"></p>
+    <div class="dlg-actions">
+      <button value="no" class="btn text">取消</button>
+      <button value="yes" class="btn filled">确认</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="info" class="m3-dialog">
+  <form method="dialog">
+    <h2 id="info-title">已完成</h2>
+    <p class="dlg-body" id="info-text"></p>
+    <div class="dlg-actions"><button value="ok" class="btn filled">知道了</button></div>
+  </form>
+</dialog>
+
+<div class="snackbar" id="snack"></div>
+<script src="/app.js"></script>
+</body>
+</html>
