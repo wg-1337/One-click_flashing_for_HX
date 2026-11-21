@@ -205,10 +205,11 @@
         since = st.events[st.events.length - 1].id;
         renderLog(st.events);
       }
+      if (st.version) $("ver").textContent = "v" + st.version;
       setChip($("c-driver"), st.driver_ok ? "ok" : "warn", st.driver_ok ? "已安装" : "未安装");
       const port = (st.edl_ports || [])[0];
       setChip($("c-edl"), port ? "ok" : "", port || "未连接");
-      setChip($("c-adb"), st.adb_serial ? "ok" : "", st.adb_serial || "未连接");
+      setChip($("c-adb"), st.adb_serial ? "ok" : "", st.adb_serial ? "已连接" : "未连接");
 
       renderSpec(st.device || {});
       renderSteps(st.phase);
@@ -225,8 +226,37 @@
     if (!r.ok) { toast(r.error || "启动失败"); $("btn-flash").disabled = false; }
   };
   $("btn-adb").onclick = async () => {
-    const r = await fetch("/api/adb/freeze", { method: "POST" }).then((x) => x.json());
-    if (!r.ok) toast(r.error || "启动失败");
+    const btn = $("btn-adb");
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "探测中…";
+    try {
+      const r = await fetch("/api/adb/disable", { method: "POST" }).then((x) => x.json());
+      if (r.ok) {
+        const list = (r.results || []).map((x) => `${x.ok ? "✓" : "✗"} ${x.pkg}`).join("\n");
+        showInfo("已停用相关应用",
+          `设备：${r.serial}\n\n${list}\n\n` +
+          "请不要打开应用市场、云空间、华为账号、系统更新等华为账号相关功能。\n" +
+          "如需恢复：adb shell pm enable <包名>");
+      } else if (r.reason === "no_device") {
+        showInfo("未检测到设备",
+          "用数据线连接电脑，在平板上打开 USB 调试并允许授权，然后重新点“仅 ADB 禁用”。");
+      } else if (r.reason === "unauthorized") {
+        showInfo("需要授权",
+          "平板上应该弹出了 USB 调试授权窗口：勾选“始终允许”并确定，然后再试一次。");
+      } else if (r.reason === "busy") {
+        toast("任务进行中，请稍候");
+      } else if (r.reason === "adb_missing") {
+        showInfo("缺少 adb", "未找到 " + (r.detail || "adb") + "，请使用完整安装包。");
+      } else {
+        showInfo("停用未完成", "设备状态：" + (r.reason || "未知"));
+      }
+    } catch (e) {
+      toast("请求失败");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   };
   $("btn-driver").onclick = () => {
     toast("正在安装高通驱动，请在弹出的窗口里确认");

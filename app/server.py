@@ -40,6 +40,8 @@ ADB_EXE = os.path.join(BASE, "tools", "platform-tools", "adb.exe")
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
+APP_VERSION = "0.0.2"
+
 EXPECTED_MSM_ID = 0x1B80E1          # SM6225 / 骁龙 680
 REQUIRED_PARTITIONS = ["oeminfo", "super", "userdata", "version", "boot", "vbmeta"]
 ERASE_TARGETS = ["userdata", "version"]
@@ -110,6 +112,7 @@ class Store:
                 "prompt": self.prompt,
                 "running": self.running,
                 "adb_serial": self.adb_serial,
+                "version": APP_VERSION,
                 "driver_ok": self.device.get("driver_ok"),
                 "edl_ports": [p[0] for p in core.list_edl_ports()],
             }
@@ -212,6 +215,13 @@ def adb_run(args, timeout=60, serial=None):
         return 124, "adb 超时"
 
 
+def mask_serial(serial):
+    """序列号只保留前 4 位，避免日志/界面泄露。"""
+    if not serial:
+        return "****"
+    return serial[:4] + "****"
+
+
 def adb_devices():
     rc, out = adb_run(["devices"], timeout=30)
     devs = []
@@ -229,7 +239,7 @@ def adb_ensure_server():
 
 
 def freeze_packages(serial):
-    ST.log("开始冻结华为管控相关包（设备 %s）" % serial, "info")
+    ST.log("开始停用华为管控相关包（设备 %s）" % mask_serial(serial), "info")
     ok_all = True
     for pkg in FREEZE_PACKAGES:
         rc, out = adb_run(["shell", "pm", "disable-user", "--user", "0", pkg],
@@ -257,7 +267,7 @@ def watch_adb_and_freeze(timeout=1800):
         if devs:
             serial, state = devs[0]
             if state != last_state:
-                ST.log("检测到设备 %s（状态 %s）" % (serial, state), "info")
+                ST.log("检测到设备 %s（状态 %s）" % (mask_serial(serial), state), "info")
                 last_state = state
             if state == "device":
                 with ST.lock:
@@ -446,34 +456,46 @@ def flash_worker():
         ST.set_progress(0, 0)
 
 
-def adb_only_worker():
-    ST.running = True
-    try:
-        if not os.path.exists(ADB_EXE):
-            ST.log("未找到 adb：%s" % ADB_EXE, "error")
-            ST.set_phase("error")
-            return
-        adb_ensure_server()
+def adb_disable_only(wait_seconds=15):
+    """仅走 ADB：探测设备并停用管控相关应用，返回结构化结果。"""
+    if not os.path.exists(ADB_EXE):
+        return {"ok": False, "reason": "adb_missing", "detail": ADB_EXE}
+    ST.log("仅 ADB 模式：开始探测设备", "info")
+    adb_ensure_server()
+    deadline = time.time() + wait_seconds
+    serial = state = None
+    while time.time() < deadline:
         devs = adb_devices()
-        if not devs:
-            ST.log("未检测到 ADB 设备：请确认已开启 USB 调试并授权", "warn")
-            ST.set_phase("adb_wait")
-            ok = watch_adb_and_freeze()
-            if not ok:
-                ST.set_phase("guide")
-            return
-        serial, state = devs[0]
-        if state != "device":
-            ST.log("设备状态为 %s，请在平板上允许 USB 调试" % state, "warn")
-            ST.set_phase("guide")
-            return
-        with ST.lock:
-            ST.adb_serial = serial
-        ST.set_phase("freezing")
-        freeze_packages(serial)
-        ST.set_phase("done")
-    finally:
-        ST.running = False
+        if devs:
+            serial, state = devs[0]
+            if state == "device":
+                break
+        time.sleep(1)
+
+    if not serial:
+        ST.log("未检测到 ADB 设备", "warn")
+        return {"ok": False, "reason": "no_device",
+                "detail": "adb devices 中没有设备"}
+    if state != "device":
+        ST.log("设备状态为 %s，需要先在平板上允许 USB 调试" % state, "warn")
+        return {"ok": False, "reason": "unauthorized" if state == "unauthorized" else state,
+                "serial": serial}
+
+    with ST.lock:
+        ST.adb_serial = serial
+    ST.log("检测到设备 %s，开始停用应用" % mask_serial(serial), "info")
+
+    results = []
+    for pkg in FREEZE_PACKAGES:
+        rc, out = adb_run(["shell", "pm", "disable-user", "--user", "0", pkg],
+                          timeout=60, serial=serial)
+        text = (out or "").strip()
+        ok = "disabled-user" in text.lower()
+        line = text.splitlines()[-1] if text else ""
+        results.append({"pkg": pkg, "ok": ok, "msg": line})
+        ST.log(("已停用 " if ok else "停用失败 ") + pkg, "success" if ok else "error")
+
+    return {"ok": all(r["ok"] for r in results), "serial": mask_serial(serial), "results": results}
 
 
 # --------------------------------------------------------------------------
@@ -544,12 +566,11 @@ class Handler(BaseHTTPRequestHandler):
             ST.set_phase("starting")
             threading.Thread(target=flash_worker, daemon=True).start()
             return self._json({"ok": True})
-        if path == "/api/adb/freeze":
+        if path == "/api/adb/disable":
             if ST.running:
-                return self._json({"ok": False, "error": "任务进行中"})
-            ST.log("========== 检测 ADB 并冻结 ==========", "info")
-            threading.Thread(target=adb_only_worker, daemon=True).start()
-            return self._json({"ok": True})
+                return self._json({"ok": False, "reason": "busy", "detail": "任务进行中"})
+            ST.log("========== 仅 ADB 禁用 ==========", "info")
+            return self._json(adb_disable_only())
         if path == "/api/answer":
             data = self._body()
             ok = ST.answer(int(data.get("id", 0)), bool(data.get("answer")))
