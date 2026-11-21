@@ -51,7 +51,8 @@ logs/                    运行日志（不入库）
 
 ### 直接运行打包版
 
-双击 `一键刷机.exe`（首次启动自解压约 10~15 秒），程序会启动本地服务并打开
+从 [Releases](https://github.com/wg-1337/One-click_flashing_for_HX/releases) 下载
+`OneClickFlash-v0.0.1.exe`，双击运行（首次启动自解压约 10~15 秒），程序会启动本地服务并打开
 `http://127.0.0.1:8765/`。重复双击只会再打开一个页面。
 
 ### 源码运行
