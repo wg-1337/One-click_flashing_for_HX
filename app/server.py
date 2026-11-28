@@ -34,16 +34,17 @@ WEB = os.path.join(BASE, "web")
 LOG_DIR = os.path.join(APP_DIR, "logs")
 
 LOADER = os.path.join(BASE, "assets", "loaders", "HuaweiCommon_680_devprg.elf")
+VERSION_IMG = os.path.join(BASE, "assets", "images", "version.img.gz")
 QUD_INSTALLER = os.path.join(BASE, "assets", "drivers", "QUD.WIN.1.1_Installer_10037.3_Setup.exe")
 ADB_DRIVER_INSTALLER = os.path.join(BASE, "assets", "drivers", "一键安装安卓驱动.exe")
 ADB_EXE = os.path.join(BASE, "tools", "platform-tools", "adb.exe")
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
-APP_VERSION = "0.0.3"
+APP_VERSION = "0.0.4"
 
 REQUIRED_PARTITIONS = ["oeminfo", "super", "userdata", "version", "boot", "vbmeta"]
-ERASE_TARGETS = ["userdata", "version"]
+ERASE_TARGETS = ["userdata"]
 FREEZE_PACKAGES = [
     "com.huawei.hwid",
     "com.huawei.android.hwouc",
@@ -343,6 +344,36 @@ def erase_partition(session, part):
     return ok
 
 
+def write_version_image(session, gpt):
+    """将内置 version.img.gz 流式写入 version 分区（不足补零）。"""
+    fh = session.firehose
+    part = next((p for p in gpt["partitions"] if p["name"] == "version"), None)
+    if part is None:
+        raise core.EdlError("分区表中没有 version 分区")
+    expected = part["sectors"] * fh.sector_size
+    if not os.path.exists(VERSION_IMG):
+        raise core.EdlError("内置 version 镜像缺失：%s" % VERSION_IMG)
+
+    import gzip
+    t0 = time.time()
+
+    def chunks():
+        with gzip.open(VERSION_IMG, "rb") as gz:
+            remaining = expected
+            while remaining > 0:
+                data = gz.read(min(fh.max_payload, remaining))
+                if not data:
+                    yield b"\x00" * remaining
+                    return
+                yield data
+                remaining -= len(data)
+
+    written = fh.program_stream(0, part["start_lba"], part["sectors"], "version.img",
+                                chunks(), expected,
+                                progress=lambda done, total: ST.set_progress(done, total, "写入 version"))
+    ST.log("version 回写完成：%d 字节，用时 %.1fs" % (written, time.time() - t0), "success")
+
+
 def flash_worker():
     ST.running = True
     session = None
@@ -403,22 +434,27 @@ def flash_worker():
         # 4. 擦除确认
         parts = {p["name"]: p for p in gpt["partitions"]}
         targets = [parts[n] for n in ERASE_TARGETS if n in parts]
-        size_txt = "、".join("%s（%.1f GB）" % (p["name"], p["size_bytes"] / (1024 ** 3))
-                            for p in targets)
+        part_version = parts.get("version")
         ST.set_phase("erase_prompt")
-        if not ST.ask("erase", "是否擦除 userdata 和 version？",
-                      "将擦除：%s\n\n擦除后设备数据不可恢复。" % size_txt):
-            ST.log("跳过擦除，直接重启设备", "warn")
+        prompt = ("将擦除：userdata（%.2f GB）\n"
+                  "并将 version 分区回写为内置镜像（%.1f MB）\n\n擦除后设备数据不可恢复。"
+                  % (targets[0]["size_bytes"] / (1024 ** 3),
+                     part_version["size_bytes"] / 1048576 if part_version else 0))
+        if not ST.ask("erase", "是否擦除 userdata 并回写 version？", prompt):
+            ST.log("跳过擦除与回写，直接重启设备", "warn")
         else:
             if not ST.ask("erase2", "二次确认",
-                          "请再次确认：擦除 %s 后数据无法找回，设备将恢复出厂状态。"
-                          % "、".join(ERASE_TARGETS)):
+                          "请再次确认：userdata 擦除后无法找回，version 将被内置镜像覆盖。"):
                 ST.log("二次确认被取消，跳过擦除", "warn")
             else:
                 ST.set_phase("erasing")
                 for p in targets:
                     if not erase_partition(session, p):
                         ST.log("%s 擦除失败，建议进 recovery 恢复出厂设置" % p["name"], "error")
+                if part_version is not None:
+                    ST.set_phase("writing_version")
+                    ST.log("回写内置 version 镜像 ...")
+                    write_version_image(session, gpt)
                 ST.set_phase("erased")
 
         # 5. 重启

@@ -11,7 +11,10 @@ SEP = os.pathsep  # Windows 下是 ';'
 
 ADD_DATA = [
     (os.path.join(ROOT, "web"), "web"),
-    (os.path.join(ROOT, "assets"), "assets"),
+    (os.path.join(ROOT, "assets", "loaders"), "assets/loaders"),
+    (os.path.join(ROOT, "assets", "drivers"), "assets/drivers"),
+    (os.path.join(ROOT, "assets", "icon"), "assets/icon"),
+    (os.path.join(ROOT, "assets", "images", "version.img.gz"), "assets/images"),
     (os.path.join(ROOT, "tools"), "tools"),
 ]
 

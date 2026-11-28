@@ -19,7 +19,7 @@
     idle: null, starting: "driver", checking_driver: "driver", driver_missing: "driver",
     waiting_device: "connect", connecting: "connect",
     reading_gpt: "verify",
-    erase_prompt: "erase", erasing: "erase", erased: "erase",
+    erase_prompt: "erase", erasing: "erase", writing_version: "erase", erased: "erase",
     rebooting: "reboot",
     guide: "guide", adb_wait: "guide",
     freezing: "freeze", done: null, error: null,
@@ -28,7 +28,8 @@
     idle: "空闲", starting: "准备中", checking_driver: "检查驱动",
     driver_missing: "缺少驱动", waiting_device: "等待设备进入 9008",
     connecting: "连接中", reading_gpt: "读取分区表",
-    erase_prompt: "等待确认", erasing: "擦除中", erased: "擦除完成",
+    erase_prompt: "等待确认", erasing: "擦除 userdata 中",
+    writing_version: "回写 version 镜像", erased: "擦除/回写完成",
     rebooting: "重启设备", guide: "等待激活并连接 ADB", adb_wait: "等待 ADB",
     freezing: "停用应用", done: "完成", error: "出错",
   };
@@ -329,8 +330,8 @@
         showInfo("请不要使用华为账号相关功能",
           "已停用：com.huawei.hwid、com.huawei.android.hwouc、com.huawei.hms.dupdateengine、com.huawei.android.hsf。\n\n之后不要打开应用市场、云空间、华为账号等华为账号相关功能。");
       } else {
-        handlePrompt({ id: -1, kind: "erase", title: "是否擦除 userdata 和 version？",
-          text: "将擦除：userdata（48.29 GB）、version（576.00 MB）" });
+        handlePrompt({ id: -1, kind: "erase", title: "是否擦除 userdata 并回写 version？",
+          text: "将擦除：userdata（48.29 GB）\n并将 version 分区回写为内置镜像（576.00 MB）\n擦除后数据不可恢复。" });
       }
     }, 500);
   }

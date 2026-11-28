@@ -22,7 +22,7 @@
 
 - 启动时自动检查高通 9008 驱动（`pnputil` 中的 `qcser.inf`），缺失则提权静默安装
 - 读取设备标识（序列号、MSM HW ID）与 GPT 分区表，校验存储类型与关键分区后才继续
-- 擦除 `userdata` / `version`（两次确认），再重启设备
+- 擦除 `userdata`（两次确认），并把 `version` 分区回写为随包内置镜像，再重启设备
 - 重启后按 5 步手动清单引导：恢复出厂 → 无网络热点激活 → 开发者选项 → USB 调试 → 授权连接
 - ADB 连接后自动停用 `com.huawei.hwid`、`com.huawei.android.hwouc`、
   `com.huawei.hms.dupdateengine`、`com.huawei.android.hsf`，并提示不要使用华为账号相关功能
@@ -39,6 +39,7 @@ cli/read_info.py         命令行：识别设备并打印分区表
 cli/read_gpt_fast.py     命令行：最短路径读 GPT
 cli/watch_and_read.py    命令行：等拔插后自动回读并保存
 assets/loaders/          9008 引导（HuaweiCommon_680_devprg.elf）
+assets/images/           version.img.gz（内置 version 镜像，源码运行需与代码同在；原始 .img 不入库）
 assets/drivers/          高通 USB 驱动、ADB 驱动安装包
 assets/icon/             应用图标
 tools/platform-tools/    adb 37.0.3
@@ -87,7 +88,8 @@ python scripts/build_exe.py
 1. **驱动**：缺驱动先装（UAC）。
 2. **连接**：等 9008 端口 → Sahara 握手（必要时 `0x13` 复位状态机）→ 上传引导 → `configure(emmc)`。
 3. **校验**：读 GPT，核对 eMMC 存储类型与关键分区（`oeminfo super userdata version boot vbmeta`），不符即中止。
-4. **擦除**：弹窗询问是否擦除 `userdata` + `version` → 二次确认 → `<erase>`（不支持则退回写零）。
+4. **擦除/回写**：弹窗确认后擦除 `userdata`（两次确认，`<erase>` 不支持则退回写零），
+   再把内置 `assets/images/version.img.gz` 流式解压写入 `version` 分区。
 5. **重启**：`<power value="reset"/>`，并弹出 5 步手动清单。
 6. **激活**：按清单操作，直到设备以 `device` 状态出现在 `adb devices`。
 7. **停用**：执行 `pm disable-user --user 0 <包名>`，完成后提示不要使用华为账号 / HMS 功能。
@@ -130,6 +132,7 @@ python scripts/build_exe.py
 
 ## 更新日志
 
+- **v0.0.4**（2026-11-28）：不再擦除 `version` 分区，改为把随包内置的 `version.img.gz` 流式回写到该分区（镜像已随 exe 内置，0.9 MB 压缩 / 576 MB 原始）
 - **v0.0.3**（2026-11-28）：移除 MSM_ID（芯片型号）校验，兼容其他高通机型的华为/荣耀平板；校验仍保留 eMMC 存储类型与关键分区检查
 - **v0.0.2**（2026-11-22）：新增「仅 ADB 禁用」独立入口；标题栏显示版本号；ADB 停用路径完成真机验证
 - **v0.0.1**（2026-11-21）：首个公测版，9008 校验 / 擦除 / 重启与激活引导

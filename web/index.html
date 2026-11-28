@@ -29,7 +29,7 @@
     <section class="card">
       <div class="card-head"><h2>操作</h2></div>
       <div class="card-body">
-        <p class="desc">先读取分区表核对机型，确认后擦除数据分区，再重启设备。</p>
+        <p class="desc">先读取分区表核对机型，然后擦除 userdata 并把 version 回写为内置镜像，再重启设备。</p>
         <div class="actions">
           <button class="btn filled" id="btn-flash">开始刷机</button>
           <button class="btn tonal" id="btn-adb">仅 ADB 禁用</button>
@@ -40,7 +40,7 @@
         </div>
         <div class="progress"><div class="bar" id="bar"></div></div>
         <div class="progress-meta"><span id="phase-label">空闲</span><span id="meter-val">—</span></div>
-        <p class="footnote warn-note">擦除前请先在 9008 下完整回读备份全字库（eMMC 全镜像），擦除后数据不可恢复。本工具按“原样”提供，刷机风险自负。</p>
+        <p class="footnote warn-note">擦除 userdata 前请先在 9008 下完整回读备份全字库（eMMC 全镜像），擦除后数据不可恢复；version 分区将回写为随包内置镜像。</p>
       </div>
     </section>
 
@@ -92,7 +92,7 @@
         <li data-step="driver"><i>1</i><div><b>驱动</b><span>检查 9008 驱动</span></div></li>
         <li data-step="connect"><i>2</i><div><b>连接</b><span>握手并载入引导</span></div></li>
         <li data-step="verify"><i>3</i><div><b>校验</b><span>读取分区表核对机型</span></div></li>
-        <li data-step="erase"><i>4</i><div><b>擦除</b><span>userdata、version</span></div></li>
+        <li data-step="erase"><i>4</i><div><b>擦除/回写</b><span>userdata 擦除 · version 回写镜像</span></div></li>
         <li data-step="reboot"><i>5</i><div><b>重启</b><span>进入恢复模式</span></div></li>
         <li data-step="guide"><i>6</i><div><b>激活</b><span>开启 USB 调试</span></div></li>
         <li data-step="freeze"><i>7</i><div><b>冻结</b><span>停用管控相关应用</span></div></li>

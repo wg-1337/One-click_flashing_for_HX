@@ -442,6 +442,33 @@ class Firehose:
             pass
         return data
 
+    def program_stream(self, lun, start_sector, num_sectors, filename, chunks,
+                       total, progress=None, timeout=600.0):
+        """流式 <program>：chunks 产出数据块，边收边写，适合大镜像。"""
+        xml = ('<?xml version="1.0" ?><data><program SECTOR_SIZE_IN_BYTES="%d" '
+               'num_partition_sectors="%d" physical_partition_number="%d" '
+               'start_sector="%d" filename="%s"/></data>'
+               % (self.sector_size, num_sectors, lun, start_sector,
+                  os.path.basename(filename)))
+        resp = self.send_xml(xml)
+        self.check(resp, "program start")
+        written = 0
+        for chunk in chunks:
+            if not chunk:
+                continue
+            if len(chunk) % self.sector_size:
+                chunk += b"\x00" * (self.sector_size - len(chunk) % self.sector_size)
+            self.link.write(chunk)
+            written += len(chunk)
+            if progress:
+                progress(min(written, total), total)
+        resp = self._read_xml(timeout=timeout)
+        m = RESP_RE.search(resp)
+        attrs = dict(ATTR_RE.findall(m.group(1))) if m else {}
+        if attrs.get("value", "").upper() != "ACK":
+            raise EdlError("program stream failed: %s" % resp[:200])
+        return written
+
     def erase(self, lun, start_sector, num_sectors, timeout=180.0):
         """<erase> (fast trim); returns True on ACK, False if unsupported."""
         xml = ('<?xml version="1.0" ?><data><erase SECTOR_SIZE_IN_BYTES="%d" '
