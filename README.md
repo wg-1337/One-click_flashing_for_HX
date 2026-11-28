@@ -21,7 +21,7 @@
 ## 功能
 
 - 启动时自动检查高通 9008 驱动（`pnputil` 中的 `qcser.inf`），缺失则提权静默安装
-- 读取设备标识（序列号、MSM HW ID）与 GPT 分区表，校验机型后才会继续
+- 读取设备标识（序列号、MSM HW ID）与 GPT 分区表，校验存储类型与关键分区后才继续
 - 擦除 `userdata` / `version`（两次确认），再重启设备
 - 重启后按 5 步手动清单引导：恢复出厂 → 无网络热点激活 → 开发者选项 → USB 调试 → 授权连接
 - ADB 连接后自动停用 `com.huawei.hwid`、`com.huawei.android.hwouc`、
@@ -86,7 +86,7 @@ python scripts/build_exe.py
 
 1. **驱动**：缺驱动先装（UAC）。
 2. **连接**：等 9008 端口 → Sahara 握手（必要时 `0x13` 复位状态机）→ 上传引导 → `configure(emmc)`。
-3. **校验**：读 GPT，核对 eMMC、MSM_ID（预期 `0x1B80E1` / SM6225）、关键分区，不符即中止。
+3. **校验**：读 GPT，核对 eMMC 存储类型与关键分区（`oeminfo super userdata version boot vbmeta`），不符即中止。
 4. **擦除**：弹窗询问是否擦除 `userdata` + `version` → 二次确认 → `<erase>`（不支持则退回写零）。
 5. **重启**：`<power value="reset"/>`，并弹出 5 步手动清单。
 6. **激活**：按清单操作，直到设备以 `device` 状态出现在 `adb devices`。
@@ -130,6 +130,7 @@ python scripts/build_exe.py
 
 ## 更新日志
 
+- **v0.0.3**（2026-11-28）：移除 MSM_ID（芯片型号）校验，兼容其他高通机型的华为/荣耀平板；校验仍保留 eMMC 存储类型与关键分区检查
 - **v0.0.2**（2026-11-22）：新增「仅 ADB 禁用」独立入口；标题栏显示版本号；ADB 停用路径完成真机验证
 - **v0.0.1**（2026-11-21）：首个公测版，9008 校验 / 擦除 / 重启与激活引导
 

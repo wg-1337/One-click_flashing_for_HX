@@ -40,9 +40,8 @@ ADB_EXE = os.path.join(BASE, "tools", "platform-tools", "adb.exe")
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
-APP_VERSION = "0.0.2"
+APP_VERSION = "0.0.3"
 
-EXPECTED_MSM_ID = 0x1B80E1          # SM6225 / 骁龙 680
 REQUIRED_PARTITIONS = ["oeminfo", "super", "userdata", "version", "boot", "vbmeta"]
 ERASE_TARGETS = ["userdata", "version"]
 FREEZE_PACKAGES = [
@@ -314,11 +313,6 @@ def verify_device(session, gpt):
     problems = []
     if fh.memory.lower() != "emmc":
         problems.append("存储类型不是 eMMC（%s）" % fh.memory)
-    hwid = dev.get("msm_hwid")
-    if hwid:
-        msm = (hwid >> 24) & 0xFFFFFFFF
-        if msm != EXPECTED_MSM_ID:
-            problems.append("MSM_ID 0x%X 与预期 0x%X 不符" % (msm, EXPECTED_MSM_ID))
     names = {p["name"] for p in gpt["partitions"]}
     missing = [n for n in REQUIRED_PARTITIONS if n not in names]
     if missing:
